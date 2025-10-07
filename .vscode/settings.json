@@ -1,0 +1,52 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.espIdfPath": "/home/oscar/workspace/estudo/esp32/v5.5.1/esp-idf",
+  "idf.toolsPath": "/home/oscar/.espressif",
+  "idf.pythonInstallPath": "/usr/bin/python3",
+  "idf.port": "/dev/ttyACM0",
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "clangd.path": "/home/oscar/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=/home/oscar/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc",
+    "--compile-commands-dir=/home/oscar/workspace/estudo/esp32/spiffs/build"
+  ],
+  "files.associations": {
+    "*.dbclient-js": "javascript",
+    "esp_http_server.h": "c",
+    "esp_event.h": "c",
+    "esp_log.h": "c",
+    "string.h": "c",
+    "cstdlib": "c",
+    "err.h": "c",
+    "sys.h": "c",
+    "nvs_flash.h": "c",
+    "esp_netif.h": "c",
+    "esp_mac.h": "c",
+    "protocol_examples_common.h": "c",
+    "temperature_sensor.h": "c",
+    "esp_spiffs.h": "c",
+    "stdio.h": "c",
+    "unistd.h": "c",
+    "esp_err.h": "c",
+    "array": "c",
+    "charconv": "c",
+    "compare": "c",
+    "complex": "c",
+    "functional": "c",
+    "ratio": "c",
+    "tuple": "c",
+    "type_traits": "c",
+    "utility": "c",
+    "variant": "c",
+    "text_encoding": "c",
+    "thread": "c",
+    "new": "c",
+    "stat.h": "c",
+    "assert.h": "c",
+    "freertos.h": "c"
+  },
+  "idf.flashType": "UART"
+}
