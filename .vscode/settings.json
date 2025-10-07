@@ -11,7 +11,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=/home/oscar/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc",
-    "--compile-commands-dir=/home/oscar/workspace/estudo/esp32/spiffs/build"
+    "--compile-commands-dir=/home/oscar/workspace/estudo/esp32/mesh/build"
   ],
   "files.associations": {
     "*.dbclient-js": "javascript",

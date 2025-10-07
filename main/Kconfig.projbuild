@@ -1,13 +1,11 @@
-menu "Configurações SPIFFS"
+menu "Configurações"
     config EXAMPLE_SPIFFS_CHECK_ON_START
         bool "Run SPIFFS_check on every start-up"
         default y
         help
             If this config item is set, esp_spiffs_check() will be run on every start-up.
             Slow on large flash sizes.
-endmenu
-
-menu "Configurações Access Point"
+            
     config ESP_WIFI_SSID
         string "WiFi SSID"
         default "myssid"
@@ -45,9 +43,7 @@ menu "Configurações Access Point"
         default 600
         help
             GTK rekeying interval in seconds.
-endmenu
-
-menu "Configurações Mesh"
+            
     choice
         bool "Mesh Topology"
         default MESH_TOPO_TREE
