@@ -49,6 +49,8 @@ uint32_t flash_size;
 
 temperature_sensor_handle_t temp_sensor = NULL;
 temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
+char *temperatures[10] = { "", "", "", "", "", "", "", "", "", "" };
+uint32_t index_temperature = 0;
 
 int reset_flag = 4;
 
@@ -254,6 +256,88 @@ static const httpd_uri_t root = {
   .user_ctx = NULL
 };
 
+// lista de temperaturas
+static esp_err_t get_temperatures_handler(httpd_req_t *req) {
+  char *buf = "<table><thead><tr><th>ID</th><th>MAC</th><th>Temperatura</th></tr></thead><tbody>";
+  for (int i = 0; i < 10; i++) {
+    if (temperatures[i] != NULL) {
+      buf = concat(buf, temperatures[i]);
+    }
+  }
+  buf = concat(buf, "</tbody></table>");
+
+  httpd_resp_set_type(req, "text/plain");
+  httpd_resp_send_chunk(req, buf, -1);
+  httpd_resp_send_chunk(req, NULL, 0);
+
+  return ESP_OK;
+}
+
+// Estrutura de lista de temperaturas
+static const httpd_uri_t get_temperatures = {
+  .uri = "/get_temperatures",
+  .method = HTTP_GET,
+  .handler = get_temperatures_handler,
+  .user_ctx = NULL
+};
+
+// insere temperatura
+static esp_err_t set_temperature_handler(httpd_req_t *req) {
+  char buf[57];
+  char* _prm = "";
+  int ret, remaining = req->content_len;
+
+  if (remaining > 0) {
+    while (remaining > 0) {
+      if ((ret = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)))) <= 0) {
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+          continue;
+        }
+        return ESP_FAIL;
+      }
+      _prm = concat(_prm, buf);
+      remaining -= ret;
+    }
+
+    char** tokens = split(_prm, '&');
+    // free(_prm);
+    char* prm = "<tr>";
+    for (int i = 0; *(tokens + i); i++) {
+      char** key_value = split(*(tokens + i), '=');
+      if (strcmp(*(key_value + 0), "id") == 0 || strcmp(*(key_value + 0), "mac") == 0 || strcmp(*(key_value + 0), "temperature") == 0) {
+        prm = concat(prm, "<td>");
+        prm = concat(prm, *(key_value + 1));
+        prm = concat(prm, "</td>");
+      }
+      // free(*(tokens + i));
+    }
+    prm = concat(prm, "</tr>");
+
+    temperatures[index_temperature] = prm;
+    index_temperature++;
+    if (index_temperature >= 10) index_temperature = 0;
+  }
+
+  const char *response = (const char *) HTML_NEW;
+  esp_err_t error = httpd_resp_send(req, response, strlen(response));
+  if (error == ESP_OK) {
+    ESP_LOGI(TAG_SERVER, "SSID New - Response sent Successfully");
+  } else {
+    ESP_LOGI(TAG_SERVER, "SSID New - Error %d while sending Response", error);
+  }
+  // free(response);
+
+  return ESP_OK;
+}
+
+// Estrutura da página de teste
+static const httpd_uri_t set_temperature = {
+  .uri = "/set_temperature",
+  .method = HTTP_POST,
+  .handler = set_temperature_handler,
+  .user_ctx = NULL
+};
+
 // página de temperature
 static esp_err_t temperature_get_handler(httpd_req_t *req) {
   float tsens_value;
@@ -394,6 +478,8 @@ static httpd_handle_t start_webserver(void) {
   if (httpd_start(&server, &config) == ESP_OK) {
     ESP_LOGI(TAG_SERVER, "Registering URI handlers");
     httpd_register_uri_handler(server, &root);
+    httpd_register_uri_handler(server, &get_temperatures);
+    httpd_register_uri_handler(server, &set_temperature);
     httpd_register_uri_handler(server, &temperature);
     httpd_register_uri_handler(server, &info);
     httpd_register_uri_handler(server, &ssid_new);
@@ -432,6 +518,76 @@ static void connect_handler(void *arg, esp_event_base_t event_base,
     ESP_LOGI(TAG_SERVER, "Starting webserver");
     *server = start_webserver();
   }
+}
+
+
+
+/*******************************************************
+ * Tratamento do Client Web
+ *******************************************************/
+
+#define CONFIG_EXAMPLE_HTTP_ENDPOINT "192.168.15.43"
+
+esp_http_client_config_t http_client_config = {
+  .host = CONFIG_EXAMPLE_HTTP_ENDPOINT,
+  .path = "/set_temperature",
+  .disable_auto_redirect = true,
+  .method = HTTP_METHOD_POST,
+};
+
+static void http_rest_with_url(void) {
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+
+  char mac_str[18];
+  snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+  ESP_LOGI(TAG, "MAC Address: %s", mac_str);
+
+  esp_err_t err = ESP_OK;
+
+  // mesh_addr_t parent_bssid;
+  // err = esp_mesh_get_parent_bssid(&parent_bssid);
+
+  // if (err == ESP_OK) {
+  //     // Parent MAC address obtained successfully
+  //     printf("Parent MAC Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
+  //           parent_bssid.addr[0], parent_bssid.addr[1], parent_bssid.addr[2],
+  //           parent_bssid.addr[3], parent_bssid.addr[4], parent_bssid.addr[5]);
+  // } else {
+  //     // Error getting parent MAC address, e.g., not connected to a parent
+  //     printf("Failed to get parent MAC address: %s\n", esp_err_to_name(err));
+  // }
+
+  float tsens_value;
+  ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, &tsens_value));
+  ESP_LOGI(TAG, "Temperature value %.02f °C", tsens_value);
+
+  // char *post_data = "id=1&mac=00:1A:2B:3C:4D:5E&temperature=25.5&fim=1";
+  char* post_data = concat("id=", ap_id);
+  post_data = concat(post_data, "&mac=");
+  post_data = concat(post_data, mac_str);
+  post_data = concat(post_data, "&temperature=");
+  post_data = concat(post_data, float_to_s(tsens_value));
+  post_data = concat(post_data, "&fim=1");
+
+  ESP_LOGI(TAG, "Post data: %s", post_data);
+  ESP_LOGI(TAG, "Length Post data: %d", strlen(post_data));
+
+  esp_http_client_handle_t client = esp_http_client_init(&http_client_config);
+  esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
+  esp_http_client_set_post_field(client, post_data, strlen(post_data));
+  err = esp_http_client_perform(client);
+  if (err == ESP_OK) {
+    ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %" PRId64,
+      esp_http_client_get_status_code(client),
+      esp_http_client_get_content_length(client));
+  } else {
+    ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
+  }
+  // free(post_data);
+  esp_http_client_cleanup(client);
 }
 
 
@@ -966,6 +1122,15 @@ void app_main(void) {
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
   server = start_webserver();
 
+  
+
+  while (true) {
+    vTaskDelay(pdMS_TO_TICKS(10000));
+    if (ap_id != NULL) {
+      http_rest_with_url();
+    }
+  }
+  
   
 
   // Tratamento de reset de configuração
