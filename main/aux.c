@@ -4,21 +4,9 @@
 #include <assert.h>
 
 // Auxiliar para concatenar strings
-// char* concat(char* _str1, char* _str2) {
-//   char* str1 = (char*)malloc(strlen(_str1) + 1);
-//   char* str2 = (char*)malloc(strlen(_str2) + 1);
-//   strcpy(str1, _str1);
-//   strcpy(str2, _str2);
-//   size_t len = strlen(str1) + strlen(str2) + 1;
-//   char* _str = (char*)realloc(str1, sizeof(char) * len);
-//   str1 = _str;
-//   strcat(str1, str2);
-//   return str1;
-// }
 char* concat(char* _str1, char* _str2) {
   char* str = (char*)malloc(strlen(_str1) + strlen(_str2) + 2);
   sprintf(str, "%s%s", _str1, _str2);
-  // printf("%s", str);
   return str;
 }
 

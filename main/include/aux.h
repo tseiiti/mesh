@@ -78,8 +78,8 @@ const char *HTML = (const char*) "<!DOCTYPE html>\
       <div class=\"container\">\
         <h1>Web Server</h1>\
         <h3>Sensor de Temperatura</h3>\
-        <div id=\"temperature\"></div>\
         <p id=\"info\"></p>\
+        <p id=\"temperature\"></p>\
         <button type=\"button\" class=\"config\" onclick=\"location.href='/ssid_new'\">Configuração</button>\
       </div>\
       <script>\
@@ -92,10 +92,10 @@ const char *HTML = (const char*) "<!DOCTYPE html>\
           .catch(error => { console.log('Error fetching /info:', error); });\
         }, 2000);\
         var intervalId = setInterval(function() {\
-          fetch('/get_temperatures')\
+          fetch('/temperature')\
           .then(response => { return response.text(); })\
           .then(data => {\
-            document.querySelector('#temperature').innerHTML = data;\
+            document.querySelector('#temperature').innerText = `${data} °C`;\
           });\
         }, 1000);\
       </script>\
