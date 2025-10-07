@@ -95,7 +95,7 @@ const char *HTML = (const char*) "<!DOCTYPE html>\
           fetch('/temperature')\
           .then(response => { return response.text(); })\
           .then(data => {\
-            document.querySelector('#temperature').innerText = `${data} °C`;\
+            document.querySelector('#temperature').innerText = `<strong>Temperature:</strong> ${data} °C`;\
           });\
         }, 1000);\
       </script>\

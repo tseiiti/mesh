@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAD//////Pz+//////+JiNP/LCq0/z07uf8wL7T/oqLc///////8/P7///////////////////////////////////////v7/P////3/zc3p/5aV1v+wsOH/T06//0NBuv///////f3+///////////////////////////////////////o5+T/cmdY/350X/+Adlr/nJNw/7u63v8ZGK3/7Oz3///////+/v///////////////////////////////////////2pfTv+oopn/393c/15SQP/Ixcb/JiS4/7Ky4f///////Pz+/////////////////////////////fz8//////+TjID/kYl8//////99dGf/s62X/1hYzf9qacf///////v7/v////////////////////////////38/P//////w764/2hdTP//////raeg/4qBZf+Xl97/Ly6z///////+/v/////////////////////////////+/v7//////+zr6f9hVUP/5OPg/+Lg3v9rX0f/w8La/xkYr//e3vL///////39/v////////////////////////////7+/v//////dmxd/7Grov//////al9O/8bCuf8yMr3/nZzZ///////8/P7////////////////////////////9/Pz//////6GakP+Admj//////4qBd/+ooIf/bW3U/1ZVv///////+vr9//3+/v/9/f7//v7//////////////f39///////Qzcj/Y1dG//////++ubT/f3Ra/6qp4P8lI7D//v7+///////+/v////////7+//////////////38/P//////9PPy/2NXRv/W087/8fDw/2dbRv/Ix9P/GRiv/7W04P/o6PX/3d3y/+Hh9P/09Pv//////////////////f39//////+HfnH/oZuQ//////9xZ1j/vris/2ho2v8iIbb/NjW//zU0vf8PDaj/hYTS///////8/Pv/2dfS/87Lxf/Y1tH/kIh7/3BmVf//////npaM/3huXv/Qzs7/ure9/7i0vP/Y1tP/np3b/zY1tf///////////3lvYP9qXk3/fnRl/3xyY/+FfG7/+fn4/9vZ1f92a1z/fHJi/4B2ZP95b13/cGRM/9jX4/9bWcb/7O33//////+blIj/n5mN///////9/Pz//v7+//7+/v/////////////////+/v7//////3lvYP/Cvrj///////v7/P//////zcnE/5yViv///////f39//7+/v///////v7+//7+/v///v7//fz8//////+xq6L/t7Kq///////9/fz/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==">
+    <!--meta http-equiv="refresh" content="1"-->
+    <title>Web Server</title>
+    <style>
+      body {
+        font-family: 'Open Sans', sans-serif;
+        color: #333;
+        line-height: 1.6;
+        margin: 0;
+        padding: 20px;
+        background-color: #f8f8f8;
+      }
+      h1, h2 {
+        font-family: 'Montserrat', sans-serif;
+        color: #007bff;
+        margin: 0;
+      }
+      .container {
+        max-width: 960px;
+        margin: 28px auto;
+        padding: 20px;
+        background-color: #fff;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+      }
+      button {
+        background-color: #28a745;
+        color: #fff;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+      button:hover {
+        background-color: #218838;
+      }
+
+      table {
+        width: 90%;
+        border-collapse: collapse;
+        margin: 20px auto;
+        background-color: #fff;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+      }
+      th {
+        background-color: #007bff;
+        color: white;
+        font-weight: bold;
+      }
+      tr:nth-child(even) {
+        background-color: #f2f2f2;
+      }
+      tr:hover {
+        background-color: #e9e9e9;
+      }
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Web Server</h1>
+      <h3>Sensor de Temperatura</h3>
+      <div id="temperature">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>MAC</th>
+              <th>Temperatura</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>00:1A:2B:3C:4D:5E</td>
+              <td>25.5</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>00:1A:2B:3C:4D:5F</td>
+              <td>26.0</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>00:1A:2B:3C:4D:60</td>
+              <td>24.8</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>00:1A:2B:3C:4D:61</td>
+              <td>23.5</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p id="info"></p>
+      <button type="button" class="config">Configuração</button>
+    </div>
+    <script>
+      setTimeout(function() {
+        fetch('/info')
+        .then(response => { return response.text(); })
+        .then(data => {
+          document.querySelector('#info').textContent = data;
+        });
+      }, 1000);
+      var intervalId = setInterval(function() {
+        fetch('/get_temperatures')
+        .then(response => { return response.text(); })
+        .then(data => {
+          document.querySelector('#temperature').innerHTML = data;
+        });
+      }, 1000);
+    </script>
+  </body>
+</html>
