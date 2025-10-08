@@ -889,6 +889,8 @@ void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id,
 
   ap_mac = malloc(18);
   snprintf(ap_mac, 18, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+  printf("\n==============================================\n== IP address:  %s\n== MAC address: %s\n==============================================\n\n", ap_ip, ap_mac);
 }
 
 // inicia mesh
