@@ -43,6 +43,7 @@ char* ssid_name               = NULL;
 char* ssid_password           = NULL;
 char* ap_password             = NULL;
 char* ap_id                   = NULL;
+char* ap_ip                   = NULL;
 
 esp_chip_info_t chip_info;
 uint32_t flash_size;
@@ -863,6 +864,10 @@ void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id,
   ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
   ESP_LOGI(MESH_TAG, "<IP_EVENT_STA_GOT_IP>IP:" IPSTR,
            IP2STR(&event->ip_info.ip));
+  
+  int len = snprintf(NULL, 0, IPSTR, IP2STR(&event->ip_info.ip)) + 1;
+  ap_ip = malloc(len);
+  snprintf(ap_ip, len, IPSTR, IP2STR(&event->ip_info.ip));
 }
 
 // inicia mesh
