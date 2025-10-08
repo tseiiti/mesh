@@ -79,10 +79,10 @@ const char *HTML = (const char*) "<!DOCTYPE html>\
     <body>\
       <div class=\"container\">\
         <h1>Web Server</h1>\
+        <button type=\"button\" class=\"config\" onclick=\"location.href='/ssid_new'\">Configuração</button>\
         <h3>Sensor de Temperatura</h3>\
         <div id=\"info\"></div>\
         <div id=\"temperature\"></div>\
-        <button type=\"button\" class=\"config\" onclick=\"location.href='/ssid_new'\">Configuração</button>\
       </div>\
       <script>\
         setTimeout(function() {\

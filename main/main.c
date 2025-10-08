@@ -373,14 +373,28 @@ static esp_err_t ssid_create_handler(httpd_req_t *req) {
     }
   }
 
-  const char *response = (const char *) HTML_NEW;
-  esp_err_t error = httpd_resp_send(req, response, strlen(response));
+  char *response = NULL;
+  if (ap_ip == NULL) {
+    response = "<html><body><h3 style=\"font-family: 'Open Sans', sans-serif; color: #333; margin: 40px;\">\
+      As configura&ccedil;&otilde;es foram atualizadas. Favor conectar na rede.</h3></body></html>";
+  } else {
+    response = "<html><head><script>setTimeout(function(){ window.location.href = '/'; }, 10000);</script></head>\
+      <body><h3 style=\"font-family: 'Open Sans', sans-serif; color: #333; margin: 40px;\">\
+      Reiniciando... Aguarde!</h3></body></html>";
+    httpd_resp_set_hdr(req, "Location", "/");
+  }
+
+  esp_err_t error = httpd_resp_send(req, (const char *) response, strlen(response));
   if (error == ESP_OK) {
     ESP_LOGI(TAG_SERVER, "SSID New - Response sent Successfully");
   } else {
     ESP_LOGI(TAG_SERVER, "SSID New - Error %d while sending Response", error);
   }
 
+  for (int i = 5; i >= 0; i--) {
+    printf("Restarting in %d seconds...\n", i);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
   esp_restart();
   return error;
 }
@@ -989,6 +1003,7 @@ void app_main(void) {
     if (reset_flag <= 0) {
       if (stat(CONFIG_FILE_PATH, &st) == 0) {
         unlink(CONFIG_FILE_PATH);
+        esp_restart();
       }
     }
     save_reset_file();
