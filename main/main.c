@@ -44,14 +44,15 @@ char* ssid_password           = NULL;
 char* ap_password             = NULL;
 char* ap_id                   = NULL;
 char* ap_ip                   = NULL;
+char* ap_mac                  = NULL;
 
-esp_chip_info_t chip_info;
-uint32_t flash_size;
+int reset_flag = 4;
 
 temperature_sensor_handle_t temp_sensor = NULL;
 temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
 
-int reset_flag = 4;
+esp_chip_info_t chip_info;
+uint32_t flash_size;
 
 
 /*******************************************************
@@ -65,6 +66,8 @@ static esp_vfs_spiffs_conf_t spiffs_conf = {
   .max_files = 5,
   .format_if_mount_failed = true
 };
+
+struct stat st;
 
 // Verificação do ponto de montagem (pasta de arquivos)
 static esp_err_t check_spiffs(void) {
@@ -126,7 +129,6 @@ static esp_err_t save_config_file(char* _prm) {
 
   char** tokens = split(_prm, '&');
   if (tokens) {
-    struct stat st;
     if (stat(CONFIG_FILE_PATH, &st) == 0) {
       unlink(CONFIG_FILE_PATH);
     }
@@ -139,11 +141,11 @@ static esp_err_t save_config_file(char* _prm) {
     
     for (int i = 0; *(tokens + i); i++) {
       fprintf(f, "%s\n", *(tokens + i));
-      // free(*(tokens + i));
+      free(*(tokens + i));
     }
 
     fclose(f);
-    // free(tokens);
+    free(tokens);
 
     ESP_LOGI(TAG_SPI, "File written");
   }
@@ -155,7 +157,6 @@ static esp_err_t save_config_file(char* _prm) {
 static esp_err_t read_config_file(void) {
   ESP_LOGI(TAG_SPI, "Reading file: %s", CONFIG_FILE_PATH);
 
-  struct stat st;
   if (stat(CONFIG_FILE_PATH, &st) != 0) {
     return ESP_OK;
   }
@@ -182,6 +183,7 @@ static esp_err_t read_config_file(void) {
     if (strcmp(*(prm + 0), "ap_id") == 0) {
       ap_id = *(prm + 1);
     }
+    free(prm);
   }
   fclose(f);
   
@@ -193,7 +195,6 @@ static esp_err_t save_reset_file(void) {
   ESP_LOGI(TAG_SPI, "Reset file save");
 
   FILE *f;
-  struct stat st;
   if (stat(RESET_FILE_PATH, &st) == 0) {
     unlink(RESET_FILE_PATH);
   }
@@ -216,7 +217,6 @@ static esp_err_t save_reset_file(void) {
 static esp_err_t read_reset_file(void) {
   ESP_LOGI(TAG_SPI, "Reading file");
 
-  struct stat st;
   if (stat(RESET_FILE_PATH, &st) != 0) {
     return ESP_OK;
   }
@@ -240,6 +240,8 @@ static esp_err_t read_reset_file(void) {
 
 // página root
 static esp_err_t root_handler(httpd_req_t *req) {
+  ESP_LOGI(TAG_SERVER, "consumindo root");
+
   httpd_resp_set_type(req, "text/html");
   httpd_resp_send_chunk(req, HTML, -1);
   httpd_resp_send_chunk(req, NULL, 0);
@@ -257,6 +259,7 @@ static const httpd_uri_t root = {
 
 // página de temperature
 static esp_err_t temperature_get_handler(httpd_req_t *req) {
+  // ESP_LOGI(TAG_SERVER, "consumindo temperature");
   float tsens_value;
   ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, &tsens_value));
   char *buf = float_to_s(tsens_value);
@@ -264,6 +267,8 @@ static esp_err_t temperature_get_handler(httpd_req_t *req) {
   httpd_resp_set_type(req, "text/plain");
   httpd_resp_send_chunk(req, buf, -1);
   httpd_resp_send_chunk(req, NULL, 0);
+
+  free(buf);
 
   return ESP_OK;
 }
@@ -278,6 +283,8 @@ static const httpd_uri_t temperature = {
 
 // página de info
 static esp_err_t info_get_handler(httpd_req_t *req) {
+  // ESP_LOGI(TAG_SERVER, "consumindo info");
+
   esp_chip_info(&chip_info);
   esp_flash_get_size(NULL, &flash_size);
   unsigned major_rev = chip_info.revision / 100;
@@ -306,6 +313,8 @@ static esp_err_t info_get_handler(httpd_req_t *req) {
   httpd_resp_set_type(req, "text/text");
   httpd_resp_send_chunk(req, buf, -1);
   httpd_resp_send_chunk(req, NULL, 0);
+
+  free(buf);
 
   return ESP_OK;
 }
@@ -358,7 +367,6 @@ static esp_err_t ssid_create_handler(httpd_req_t *req) {
 
     // Salva arquivo de configuração
     ret = save_config_file(prm);
-    // free(prm);
 
     if (ret != ESP_OK) {
       return ret;
@@ -474,14 +482,7 @@ static void wifi_init_softap(void) {
       .channel = CONFIG_ESP_WIFI_CHANNEL,
       .password = CONFIG_ESP_WIFI_PASSWORD,
       .max_connection = CONFIG_ESP_MAX_STA_CONN,
-
-      /* se for usar WPA3 */
-      // .authmode = WIFI_AUTH_WPA3_PSK,
-      // .sae_pwe_h2e = WPA3_SAE_PWE_BOTH,
-
-      /* usando WPA2 */
       .authmode = WIFI_AUTH_WPA2_PSK,
-
       .pmf_cfg = {
         .required = true,
       },
@@ -868,6 +869,12 @@ void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id,
   int len = snprintf(NULL, 0, IPSTR, IP2STR(&event->ip_info.ip)) + 1;
   ap_ip = malloc(len);
   snprintf(ap_ip, len, IPSTR, IP2STR(&event->ip_info.ip));
+
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+
+  ap_mac = malloc(18);
+  snprintf(ap_mac, 18, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
 // inicia mesh
@@ -915,7 +922,6 @@ static esp_err_t start_mesh(void) {
       esp_mesh_is_root_fixed() ? "root fixed" : "root not fixed",
       esp_mesh_get_topology(), esp_mesh_get_topology() ? "(chain)" : "(tree)",
       esp_mesh_is_ps_enabled());
-
   return ESP_OK;
 }
 
@@ -971,7 +977,7 @@ void app_main(void) {
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
   server = start_webserver();
 
-  
+
 
   // Tratamento de reset de configuração
   esp_reset_reason_t reset_reason = esp_reset_reason();
@@ -981,7 +987,6 @@ void app_main(void) {
     reset_flag--;
     ESP_LOGI(TAG, "Reset Flag: %d", reset_flag);
     if (reset_flag <= 0) {
-      struct stat st;
       if (stat(CONFIG_FILE_PATH, &st) == 0) {
         unlink(CONFIG_FILE_PATH);
       }

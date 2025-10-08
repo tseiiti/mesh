@@ -35,7 +35,9 @@ const char *HTML = (const char*) "<!DOCTYPE html>\
         button {\
           background-color: #28a745;\
           color: #fff;\
-          padding: 10px 20px;\
+          font-weight: bold;\
+          padding: 4px 24px;\
+          margin: 12px 0px 8px;\
           border: none;\
           border-radius: 5px;\
           cursor: pointer;\
@@ -78,8 +80,8 @@ const char *HTML = (const char*) "<!DOCTYPE html>\
       <div class=\"container\">\
         <h1>Web Server</h1>\
         <h3>Sensor de Temperatura</h3>\
-        <p id=\"info\"></p>\
-        <p id=\"temperature\"></p>\
+        <div id=\"info\"></div>\
+        <div id=\"temperature\"></div>\
         <button type=\"button\" class=\"config\" onclick=\"location.href='/ssid_new'\">Configuração</button>\
       </div>\
       <script>\
@@ -87,16 +89,17 @@ const char *HTML = (const char*) "<!DOCTYPE html>\
           fetch('/info')\
           .then(response => { return response.text(); })\
           .then(data => {\
-            document.querySelector('#info').textContent = data;\
+            document.querySelector('#info').innerHTML = `<p><strong>Informações do AP:</strong> ${data}</p>`;\
           })\
-          .catch(error => { console.log('Error fetching /info:', error); });\
+          .catch(error => { /* console.log('Error fetching /info:', error); */ });\
         }, 2000);\
         var intervalId = setInterval(function() {\
           fetch('/temperature')\
           .then(response => { return response.text(); })\
           .then(data => {\
-            document.querySelector('#temperature').innerText = `<strong>Temperature:</strong> ${data} °C`;\
-          });\
+            document.querySelector('#temperature').innerHTML = `<p><strong>Temperatura do Nó:</strong> ${data} °C</p>`;\
+          })\
+          .catch(error => { /* console.log('Error fetching /temperature:', error); */ });\
         }, 1000);\
       </script>\
     </body>\
