@@ -44,16 +44,17 @@ char* ssid_password           = NULL;
 char* ap_password             = NULL;
 char* ap_id                   = NULL;
 char* ap_ip                   = NULL;
+char* ap_mac                  = NULL;
 
-esp_chip_info_t chip_info;
-uint32_t flash_size;
+int reset_flag = 4;
 
 temperature_sensor_handle_t temp_sensor = NULL;
 temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
-char *temperatures[10] = { "", "", "", "", "", "", "", "", "", "" };
+static char *temperatures[10] = { "", "", "", "", "", "", "", "", "", "" };
 uint32_t index_temperature = 0;
 
-int reset_flag = 4;
+esp_chip_info_t chip_info;
+uint32_t flash_size;
 
 
 /*******************************************************
@@ -67,6 +68,8 @@ static esp_vfs_spiffs_conf_t spiffs_conf = {
   .max_files = 5,
   .format_if_mount_failed = true
 };
+
+struct stat st;
 
 // Verificação do ponto de montagem (pasta de arquivos)
 static esp_err_t check_spiffs(void) {
@@ -128,7 +131,6 @@ static esp_err_t save_config_file(char* _prm) {
 
   char** tokens = split(_prm, '&');
   if (tokens) {
-    struct stat st;
     if (stat(CONFIG_FILE_PATH, &st) == 0) {
       unlink(CONFIG_FILE_PATH);
     }
@@ -141,11 +143,11 @@ static esp_err_t save_config_file(char* _prm) {
     
     for (int i = 0; *(tokens + i); i++) {
       fprintf(f, "%s\n", *(tokens + i));
-      // free(*(tokens + i));
+      free(*(tokens + i));
     }
 
     fclose(f);
-    // free(tokens);
+    free(tokens);
 
     ESP_LOGI(TAG_SPI, "File written");
   }
@@ -157,7 +159,6 @@ static esp_err_t save_config_file(char* _prm) {
 static esp_err_t read_config_file(void) {
   ESP_LOGI(TAG_SPI, "Reading file: %s", CONFIG_FILE_PATH);
 
-  struct stat st;
   if (stat(CONFIG_FILE_PATH, &st) != 0) {
     return ESP_OK;
   }
@@ -184,6 +185,7 @@ static esp_err_t read_config_file(void) {
     if (strcmp(*(prm + 0), "ap_id") == 0) {
       ap_id = *(prm + 1);
     }
+    free(prm);
   }
   fclose(f);
   
@@ -195,7 +197,6 @@ static esp_err_t save_reset_file(void) {
   ESP_LOGI(TAG_SPI, "Reset file save");
 
   FILE *f;
-  struct stat st;
   if (stat(RESET_FILE_PATH, &st) == 0) {
     unlink(RESET_FILE_PATH);
   }
@@ -218,7 +219,6 @@ static esp_err_t save_reset_file(void) {
 static esp_err_t read_reset_file(void) {
   ESP_LOGI(TAG_SPI, "Reading file");
 
-  struct stat st;
   if (stat(RESET_FILE_PATH, &st) != 0) {
     return ESP_OK;
   }
@@ -242,6 +242,8 @@ static esp_err_t read_reset_file(void) {
 
 // página root
 static esp_err_t root_handler(httpd_req_t *req) {
+  ESP_LOGI(TAG_SERVER, "consumindo root");
+
   httpd_resp_set_type(req, "text/html");
   httpd_resp_send_chunk(req, HTML, -1);
   httpd_resp_send_chunk(req, NULL, 0);
@@ -259,16 +261,15 @@ static const httpd_uri_t root = {
 
 // lista de temperaturas
 static esp_err_t get_temperatures_handler(httpd_req_t *req) {
-  char *buf = "<table><thead><tr><th>ID</th><th>MAC</th><th>Temperatura</th></tr></thead><tbody>";
+  // ESP_LOGI(TAG_SERVER, "consumindo get_temperatures");
+
+  httpd_resp_send_chunk(req, "<table><thead><tr><th>n°</th><th>AP</th><th>MAC</th><th>Temperatura</th></tr></thead><tbody>", -1);
   for (int i = 0; i < 10; i++) {
-    if (temperatures[i] != NULL) {
-      buf = concat(buf, temperatures[i]);
+    if (temperatures[i] != NULL && strcmp(temperatures[i], "") != 0) {
+      httpd_resp_send_chunk(req, temperatures[i], -1);
     }
   }
-  buf = concat(buf, "</tbody></table>");
-
-  httpd_resp_set_type(req, "text/plain");
-  httpd_resp_send_chunk(req, buf, -1);
+  httpd_resp_send_chunk(req, "</tbody></table>", -1);
   httpd_resp_send_chunk(req, NULL, 0);
 
   return ESP_OK;
@@ -284,7 +285,8 @@ static const httpd_uri_t get_temperatures = {
 
 // insere temperatura
 static esp_err_t set_temperature_handler(httpd_req_t *req) {
-  char buf[57];
+  ESP_LOGI(TAG_SERVER, "consumindo set_temperature");
+  char buf[100];
   char* _prm = "";
   int ret, remaining = req->content_len;
 
@@ -299,10 +301,10 @@ static esp_err_t set_temperature_handler(httpd_req_t *req) {
       _prm = concat(_prm, buf);
       remaining -= ret;
     }
-
     char** tokens = split(_prm, '&');
-    // free(_prm);
-    char* prm = "<tr>";
+    char* prm = "<tr><td>";
+    prm = concat(prm, to_s(index_temperature));
+    prm = concat(prm, "</td>");
     for (int i = 0; *(tokens + i); i++) {
       char** key_value = split(*(tokens + i), '=');
       if (strcmp(*(key_value + 0), "id") == 0 || strcmp(*(key_value + 0), "mac") == 0 || strcmp(*(key_value + 0), "temperature") == 0) {
@@ -310,23 +312,16 @@ static esp_err_t set_temperature_handler(httpd_req_t *req) {
         prm = concat(prm, *(key_value + 1));
         prm = concat(prm, "</td>");
       }
-      // free(*(tokens + i));
+      free(*(tokens + i));
     }
     prm = concat(prm, "</tr>");
+    free(tokens);
+    free(_prm);
 
-    temperatures[index_temperature] = prm;
+    temperatures[index_temperature % 10] = prm;
     index_temperature++;
-    if (index_temperature >= 10) index_temperature = 0;
   }
-
-  const char *response = (const char *) HTML_NEW;
-  esp_err_t error = httpd_resp_send(req, response, strlen(response));
-  if (error == ESP_OK) {
-    ESP_LOGI(TAG_SERVER, "SSID New - Response sent Successfully");
-  } else {
-    ESP_LOGI(TAG_SERVER, "SSID New - Error %d while sending Response", error);
-  }
-  // free(response);
+  httpd_resp_send_chunk(req, NULL, 0);
 
   return ESP_OK;
 }
@@ -341,6 +336,7 @@ static const httpd_uri_t set_temperature = {
 
 // página de temperature
 static esp_err_t temperature_get_handler(httpd_req_t *req) {
+  // ESP_LOGI(TAG_SERVER, "consumindo temperature");
   float tsens_value;
   ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, &tsens_value));
   char *buf = float_to_s(tsens_value);
@@ -348,6 +344,8 @@ static esp_err_t temperature_get_handler(httpd_req_t *req) {
   httpd_resp_set_type(req, "text/plain");
   httpd_resp_send_chunk(req, buf, -1);
   httpd_resp_send_chunk(req, NULL, 0);
+
+  free(buf);
 
   return ESP_OK;
 }
@@ -362,6 +360,8 @@ static const httpd_uri_t temperature = {
 
 // página de info
 static esp_err_t info_get_handler(httpd_req_t *req) {
+  // ESP_LOGI(TAG_SERVER, "consumindo info");
+
   esp_chip_info(&chip_info);
   esp_flash_get_size(NULL, &flash_size);
   unsigned major_rev = chip_info.revision / 100;
@@ -390,6 +390,8 @@ static esp_err_t info_get_handler(httpd_req_t *req) {
   httpd_resp_set_type(req, "text/text");
   httpd_resp_send_chunk(req, buf, -1);
   httpd_resp_send_chunk(req, NULL, 0);
+
+  free(buf);
 
   return ESP_OK;
 }
@@ -442,7 +444,6 @@ static esp_err_t ssid_create_handler(httpd_req_t *req) {
 
     // Salva arquivo de configuração
     ret = save_config_file(prm);
-    // free(prm);
 
     if (ret != ESP_OK) {
       return ret;
@@ -537,19 +538,10 @@ static void connect_handler(void *arg, esp_event_base_t event_base,
 // };
 
 static void http_rest_with_url(void) {
-  if (ap_id == NULL || ap_ip == NULL) {
-    ESP_LOGE(TAG, "AP ID or IP is NULL");
+  if (ap_id == NULL || ap_ip == NULL || ap_mac == NULL) {
+    ESP_LOGI(TAG, "AP ID, IP or MAC is NULL");
     return;
   }
-  
-  uint8_t mac[6];
-  esp_read_mac(mac, ESP_MAC_WIFI_STA);
-
-  char mac_str[18];
-  snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
-            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-  ESP_LOGI(TAG, "MAC Address: %s", mac_str);
 
   esp_err_t err = ESP_OK;
 
@@ -568,18 +560,17 @@ static void http_rest_with_url(void) {
 
   float tsens_value;
   ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, &tsens_value));
-  ESP_LOGI(TAG, "Temperature value %.02f °C", tsens_value);
 
   // char *post_data = "id=1&mac=00:1A:2B:3C:4D:5E&temperature=25.5&fim=1";
   char* post_data = concat("id=", ap_id);
   post_data = concat(post_data, "&mac=");
-  post_data = concat(post_data, mac_str);
+  post_data = concat(post_data, ap_mac);
   post_data = concat(post_data, "&temperature=");
   post_data = concat(post_data, float_to_s(tsens_value));
   post_data = concat(post_data, "&fim=1");
 
-  ESP_LOGI(TAG, "Post data: %s", post_data);
-  ESP_LOGI(TAG, "Length Post data: %d", strlen(post_data));
+  ESP_LOGI(TAG, "ip: %s", ap_ip);
+  ESP_LOGI(TAG, "post_data: %s", post_data);
 
   esp_http_client_config_t http_client_config = {
     .host = ap_ip,
@@ -599,7 +590,7 @@ static void http_rest_with_url(void) {
   } else {
     ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
   }
-  // free(post_data);
+  free(post_data);
   esp_http_client_cleanup(client);
 }
 
@@ -642,14 +633,7 @@ static void wifi_init_softap(void) {
       .channel = CONFIG_ESP_WIFI_CHANNEL,
       .password = CONFIG_ESP_WIFI_PASSWORD,
       .max_connection = CONFIG_ESP_MAX_STA_CONN,
-
-      /* se for usar WPA3 */
-      // .authmode = WIFI_AUTH_WPA3_PSK,
-      // .sae_pwe_h2e = WPA3_SAE_PWE_BOTH,
-
-      /* usando WPA2 */
       .authmode = WIFI_AUTH_WPA2_PSK,
-
       .pmf_cfg = {
         .required = true,
       },
@@ -1036,6 +1020,12 @@ void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id,
   int len = snprintf(NULL, 0, IPSTR, IP2STR(&event->ip_info.ip)) + 1;
   ap_ip = malloc(len);
   snprintf(ap_ip, len, IPSTR, IP2STR(&event->ip_info.ip));
+
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+
+  ap_mac = malloc(18);
+  snprintf(ap_mac, 18, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
 // inicia mesh
@@ -1083,7 +1073,6 @@ static esp_err_t start_mesh(void) {
       esp_mesh_is_root_fixed() ? "root fixed" : "root not fixed",
       esp_mesh_get_topology(), esp_mesh_get_topology() ? "(chain)" : "(tree)",
       esp_mesh_is_ps_enabled());
-
   return ESP_OK;
 }
 
@@ -1139,16 +1128,14 @@ void app_main(void) {
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
   server = start_webserver();
 
-  
+
 
   while (true) {
     vTaskDelay(pdMS_TO_TICKS(10000));
-    if (ap_id != NULL) {
-      http_rest_with_url();
-    }
+    http_rest_with_url();
   }
-  
-  
+
+
 
   // Tratamento de reset de configuração
   esp_reset_reason_t reset_reason = esp_reset_reason();
@@ -1158,7 +1145,6 @@ void app_main(void) {
     reset_flag--;
     ESP_LOGI(TAG, "Reset Flag: %d", reset_flag);
     if (reset_flag <= 0) {
-      struct stat st;
       if (stat(CONFIG_FILE_PATH, &st) == 0) {
         unlink(CONFIG_FILE_PATH);
       }
