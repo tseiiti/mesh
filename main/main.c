@@ -43,6 +43,7 @@ char* ssid_name               = NULL;
 char* ssid_password           = NULL;
 char* ap_password             = NULL;
 char* ap_id                   = NULL;
+char* ap_ip                   = NULL;
 
 esp_chip_info_t chip_info;
 uint32_t flash_size;
@@ -526,16 +527,21 @@ static void connect_handler(void *arg, esp_event_base_t event_base,
  * Tratamento do Client Web
  *******************************************************/
 
-#define CONFIG_EXAMPLE_HTTP_ENDPOINT "192.168.15.43"
+// #define CONFIG_EXAMPLE_HTTP_ENDPOINT "192.168.15.43"
 
-esp_http_client_config_t http_client_config = {
-  .host = CONFIG_EXAMPLE_HTTP_ENDPOINT,
-  .path = "/set_temperature",
-  .disable_auto_redirect = true,
-  .method = HTTP_METHOD_POST,
-};
+// esp_http_client_config_t http_client_config = {
+//   .host = CONFIG_EXAMPLE_HTTP_ENDPOINT,
+//   .path = "/set_temperature",
+//   .disable_auto_redirect = true,
+//   .method = HTTP_METHOD_POST,
+// };
 
 static void http_rest_with_url(void) {
+  if (ap_id == NULL || ap_ip == NULL) {
+    ESP_LOGE(TAG, "AP ID or IP is NULL");
+    return;
+  }
+  
   uint8_t mac[6];
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
 
@@ -574,6 +580,13 @@ static void http_rest_with_url(void) {
 
   ESP_LOGI(TAG, "Post data: %s", post_data);
   ESP_LOGI(TAG, "Length Post data: %d", strlen(post_data));
+
+  esp_http_client_config_t http_client_config = {
+    .host = ap_ip,
+    .path = "/set_temperature",
+    .disable_auto_redirect = true,
+    .method = HTTP_METHOD_POST,
+  };
 
   esp_http_client_handle_t client = esp_http_client_init(&http_client_config);
   esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
@@ -1019,6 +1032,10 @@ void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id,
   ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
   ESP_LOGI(MESH_TAG, "<IP_EVENT_STA_GOT_IP>IP:" IPSTR,
            IP2STR(&event->ip_info.ip));
+  
+  int len = snprintf(NULL, 0, IPSTR, IP2STR(&event->ip_info.ip)) + 1;
+  ap_ip = malloc(len);
+  snprintf(ap_ip, len, IPSTR, IP2STR(&event->ip_info.ip));
 }
 
 // inicia mesh
