@@ -29,6 +29,7 @@
 #include "driver/temperature_sensor.h"
 #include "protocol_examples_common.h"
 #include "mesh_light.h"
+#include "led_strip.h"
 #include "aux.h"
 
 #define CONFIG_FILE_PATH "/spiffs/config.txt"
@@ -47,12 +48,14 @@ char* ap_ip                   = NULL;
 char* ap_mac                  = NULL;
 
 int reset_flag = 4;
+struct stat st;
 
 temperature_sensor_handle_t temp_sensor = NULL;
 temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
 
 esp_chip_info_t chip_info;
 uint32_t flash_size;
+
 
 
 /*******************************************************
@@ -66,8 +69,6 @@ static esp_vfs_spiffs_conf_t spiffs_conf = {
   .max_files = 5,
   .format_if_mount_failed = true
 };
-
-struct stat st;
 
 // Verificação do ponto de montagem (pasta de arquivos)
 static esp_err_t check_spiffs(void) {
@@ -407,6 +408,77 @@ static const httpd_uri_t ssid_create = {
   .user_ctx = NULL
 };
 
+// Página de configuração do LED
+static esp_err_t led_handler(httpd_req_t *req) {
+  const char *response = (const char *) HTML_LED;
+  esp_err_t error = httpd_resp_send(req, response, strlen(response));
+  if (error == ESP_OK) {
+    ESP_LOGI(TAG_SERVER, "LED On - Response sent Successfully");
+  } else {
+    ESP_LOGI(TAG_SERVER, "LED On - Error %d while sending Response", error);
+  }
+  return error;
+}
+
+// Estrura da página get para cadastro de configuração wifi
+static const httpd_uri_t led = {
+  .uri = "/led",
+  .method = HTTP_GET,
+  .handler = led_handler,
+  .user_ctx = NULL
+};
+
+
+
+// API led_on
+#define BLINK_GPIO 48
+#define QUERY_KEY_MAX_LEN 64
+static led_strip_handle_t led_strip;
+
+static esp_err_t led_on_handler(httpd_req_t *req) {
+  char *buf;
+  size_t buf_len;
+  int r = 0, g = 0, b = 0;
+
+  buf_len = httpd_req_get_url_query_len(req) + 1;
+  if (buf_len > 1) {
+    buf = malloc(buf_len);
+    ESP_RETURN_ON_FALSE(buf, ESP_ERR_NO_MEM, TAG, "buffer alloc failed");
+    if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
+      ESP_LOGI(TAG, "Found URL query => %s", buf);
+      char param[QUERY_KEY_MAX_LEN] = {0};
+      if (httpd_query_key_value(buf, "r", param, sizeof(param)) == ESP_OK) {
+        r = atoi(param);
+      }
+      if (httpd_query_key_value(buf, "g", param, sizeof(param)) == ESP_OK) {
+        g = atoi(param);
+      }
+      if (httpd_query_key_value(buf, "b", param, sizeof(param)) == ESP_OK) {
+        b = atoi(param);
+      }
+      
+      led_strip_set_pixel(led_strip, 0, r, g, b);
+      led_strip_refresh(led_strip);
+      // vTaskDelay(3000 / portTICK_PERIOD_MS);
+      // led_strip_clear(led_strip);
+    }
+    free(buf);
+  }
+
+  httpd_resp_set_type(req, "text/text");
+  httpd_resp_send_chunk(req, NULL, 0);
+
+  return ESP_OK;
+}
+
+// Estrura da página led_on
+static const httpd_uri_t led_on = {
+  .uri = "/led_on",
+  .method = HTTP_GET,
+  .handler = led_on_handler,
+  .user_ctx = NULL
+};
+
 // Inicia e registra as páginas no servidor web
 static httpd_handle_t start_webserver(void) {
   httpd_handle_t server = NULL;
@@ -421,6 +493,8 @@ static httpd_handle_t start_webserver(void) {
     httpd_register_uri_handler(server, &info);
     httpd_register_uri_handler(server, &ssid_new);
     httpd_register_uri_handler(server, &ssid_create);
+    httpd_register_uri_handler(server, &led);
+    httpd_register_uri_handler(server, &led_on);
     return server;
   }
 
@@ -956,6 +1030,20 @@ void app_main(void) {
   if (ssid_password != NULL) ESP_LOGI(TAG, "ssid_password: '%s'", ssid_password);
   if (ap_password != NULL)   ESP_LOGI(TAG, "ap_password..: '%s'", ap_password);
   if (ap_id != NULL)         ESP_LOGI(TAG, "ap_id........: '%s'", ap_id);
+
+
+  printf("Example configured to blink addressable LED!");
+  led_strip_config_t strip_config = {
+      .strip_gpio_num = BLINK_GPIO,
+      .max_leds = 1,
+  };
+  led_strip_spi_config_t spi_config = {
+      .spi_bus = SPI2_HOST,
+      .flags.with_dma = true,
+  };
+  ESP_ERROR_CHECK(led_strip_new_spi_device(&strip_config, &spi_config, &led_strip));
+  led_strip_clear(led_strip);
+
 
 
   // Inicializa sensor de temperatura
